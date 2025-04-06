@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NodeMCU Control Panel</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      margin: 50px;
+    }
+    button, input {
+      padding: 12px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    .hidden {
+      display: none;
+    }
+    .status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h2>NodeMCU Control Panel</h2>
+
+  <div id="login-section">
+    <input type="email" id="email" placeholder="Email"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div id="control-section" class="hidden">
+    <p>Welcome, <span id="user-email"></span> <button onclick="logout()">Logout</button></p>
+    
+    <button onclick="toggleLamp('lamp1')">Toggle Lamp 1</button>
+    <button onclick="toggleLamp('lamp2')">Toggle Lamp 2</button>
+
+    <div class="status" id="status">Status: Checking...</div>
+
+    <h3>Switch Wi-Fi Network</h3>
+    <input type="text" id="ssid" placeholder="New SSID"><br>
+    <input type="password" id="wifi-password" placeholder="New Password"><br>
+    <button onclick="sendCredentials()">Send Credentials</button>
+  </div>
+
+  <script>
+    // Your actual Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-1v0-f_c3IKSzJumq3xhzrIlh6gvMnME",
+      authDomain: "h4xcontrol.firebaseapp.com",
+      databaseURL: "https://h4xcontrol-default-rtdb.firebaseio.com",
+      projectId: "h4xcontrol",
+      storageBucket: "h4xcontrol.appspot.com",
+      messagingSenderId: "240062027820",
+      appId: "1:240062027820:web:b6782ab1936aa28f2d7867"
+    };
+
+    const allowedEmails = ["your@email.com"]; // Replace with your actual email
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    const loginSection = document.getElementById("login-section");
+    const controlSection = document.getElementById("control-section");
+    const userEmailEl = document.getElementById("user-email");
+
+    auth.onAuthStateChanged(user => {
+      if (user && allowedEmails.includes(user.email)) {
+        loginSection.classList.add("hidden");
+        controlSection.classList.remove("hidden");
+        userEmailEl.textContent = user.email;
+        monitorStatus();
+      } else {
+        auth.signOut();
+        loginSection.classList.remove("hidden");
+        controlSection.classList.add("hidden");
+      }
+    });
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password).catch(err => {
+        alert("Login failed: " + err.message);
+      });
+    }
+
+    function logout() {
+      auth.signOut();
+    }
+
+    function toggleLamp(lamp) {
+      const lampRef = db.ref('/' + lamp);
+      lampRef.once('value').then(snapshot => {
+        lampRef.set(!snapshot.val());
+      });
+    }
+
+    function sendCredentials() {
+      const ssid = document.getElementById("ssid").value;
+      const password = document.getElementById("wifi-password").value;
+      if (ssid && password) {
+        db.ref('/credentials').set({ ssid, password });
+        alert("Credentials sent to device.");
+      } else {
+        alert("Please enter both SSID and Password.");
+      }
+    }
+
+    function monitorStatus() {
+      const statusRef = db.ref('/status/online');
+      statusRef.on('value', snapshot => {
+        const online = snapshot.val();
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = online ? "Status: Online" : "Status: Offline";
+        statusEl.style.color = online ? "green" : "red";
+      });
+    }
+  </script>
+</body>
+</html>
