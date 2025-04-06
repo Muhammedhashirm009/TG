@@ -1,125 +1,218 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>NodeMCU Control Panel</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Home Automation</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
   <style>
     body {
-      font-family: Arial;
-      text-align: center;
-      margin: 50px;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
-    button, input {
-      padding: 12px 20px;
+    .card {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
       font-size: 16px;
-      margin: 10px;
     }
-    .hidden {
-      display: none;
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      transition: background-color 0.2s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .secondary {
+      background-color: #6c757d;
+    }
+    .secondary:hover {
+      background-color: #5a6268;
     }
     .status {
-      margin-top: 20px;
       font-weight: bold;
+      font-size: 16px;
+    }
+    .on { color: green; }
+    .off { color: red; }
+    .hidden { display: none; }
+    #spinner {
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: center;
+    }
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <h2>NodeMCU Control Panel</h2>
 
-  <div id="login-section">
-    <input type="email" id="email" placeholder="Email"><br>
-    <input type="password" id="password" placeholder="Password"><br>
+  <!-- Login Card -->
+  <div id="loginCard" class="card">
+    <h2>🔐 Login to Control Your Home</h2>
+    <input type="email" id="email" placeholder="Email address" />
+    <input type="password" id="password" placeholder="Password" />
     <button onclick="login()">Login</button>
+    <button class="secondary" onclick="signup()">Sign Up</button>
   </div>
 
-  <div id="control-section" class="hidden">
-    <p>Welcome, <span id="user-email"></span> <button onclick="logout()">Logout</button></p>
+  <!-- Control Panel -->
+  <div id="controlCard" class="card hidden">
+    <h2>🏠 Home Control Panel</h2>
     
+    <div id="spinner" class="hidden"><div class="loader"></div></div>
+    <p>Device Status: <span id="status-indicator" class="status">...</span></p>
+
+    <p>Lamp 1: <span id="lamp1-status" class="status">...</span></p>
     <button onclick="toggleLamp('lamp1')">Toggle Lamp 1</button>
+    <p>Lamp 2: <span id="lamp2-status" class="status">...</span></p>
     <button onclick="toggleLamp('lamp2')">Toggle Lamp 2</button>
 
-    <div class="status" id="status">Status: Checking...</div>
+    <hr />
+    <h3>Wi-Fi Setup</h3>
+    <select id="wifiSelect"></select>
+    <input type="password" id="wifiPassword" placeholder="Wi-Fi Password" />
+    <button onclick="connectWiFi()">Connect</button>
 
-    <h3>Switch Wi-Fi Network</h3>
-    <input type="text" id="ssid" placeholder="New SSID"><br>
-    <input type="password" id="wifi-password" placeholder="New Password"><br>
-    <button onclick="sendCredentials()">Send Credentials</button>
+    <button class="secondary" onclick="logout()" style="margin-top:20px;">Logout</button>
   </div>
 
   <script>
-    // Your actual Firebase config
     const firebaseConfig = {
-      apiKey: "AIzaSyA-1v0-f_c3IKSzJumq3xhzrIlh6gvMnME",
+      apiKey: "AIzaSyBTsypZYdo6spPGG9W9MEeckgcetefDP3M",
       authDomain: "h4xcontrol.firebaseapp.com",
       databaseURL: "https://h4xcontrol-default-rtdb.firebaseio.com",
       projectId: "h4xcontrol",
       storageBucket: "h4xcontrol.appspot.com",
-      messagingSenderId: "240062027820",
-      appId: "1:240062027820:web:b6782ab1936aa28f2d7867"
+      messagingSenderId: "1030967330576",
+      appId: "1:1030967330576:web:ac3e4201a61b5bebea8795"
     };
-
-    const allowedEmails = ["your@email.com"]; // Replace with your actual email
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    const loginSection = document.getElementById("login-section");
-    const controlSection = document.getElementById("control-section");
-    const userEmailEl = document.getElementById("user-email");
-
     auth.onAuthStateChanged(user => {
-      if (user && allowedEmails.includes(user.email)) {
-        loginSection.classList.add("hidden");
-        controlSection.classList.remove("hidden");
-        userEmailEl.textContent = user.email;
-        monitorStatus();
+      if (user) {
+        document.getElementById("loginCard").classList.add("hidden");
+        document.getElementById("controlCard").classList.remove("hidden");
+        updateStatus("lamp1");
+        updateStatus("lamp2");
+        updateOnlineStatus();
+        populateWiFiList();
       } else {
-        auth.signOut();
-        loginSection.classList.remove("hidden");
-        controlSection.classList.add("hidden");
+        document.getElementById("loginCard").classList.remove("hidden");
+        document.getElementById("controlCard").classList.add("hidden");
       }
     });
 
     function login() {
       const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      auth.signInWithEmailAndPassword(email, password).catch(err => {
-        alert("Login failed: " + err.message);
-      });
+      const pass = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, pass).catch(e => alert(e.message));
+    }
+
+    function signup() {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      const allowedEmails = ["contact@hashir.site", "admin@h4x.com"];
+      if (!allowedEmails.includes(email)) {
+        alert("⛔ This email is not allowed to register.");
+        return;
+      }
+      auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     }
 
     function logout() {
       auth.signOut();
     }
 
-    function toggleLamp(lamp) {
-      const lampRef = db.ref('/' + lamp);
-      lampRef.once('value').then(snapshot => {
-        lampRef.set(!snapshot.val());
+    function updateStatus(lamp) {
+      const el = document.getElementById(`${lamp}-status`);
+      db.ref(lamp).on('value', snap => {
+        const val = snap.val();
+        el.textContent = val ? "ON" : "OFF";
+        el.className = `status ${val ? 'on' : 'off'}`;
       });
     }
 
-    function sendCredentials() {
-      const ssid = document.getElementById("ssid").value;
-      const password = document.getElementById("wifi-password").value;
-      if (ssid && password) {
-        db.ref('/credentials').set({ ssid, password });
-        alert("Credentials sent to device.");
-      } else {
-        alert("Please enter both SSID and Password.");
-      }
+    function toggleLamp(lamp) {
+      const ref = db.ref(lamp);
+      ref.once('value').then(snap => {
+        ref.set(!snap.val());
+      });
     }
 
-    function monitorStatus() {
-      const statusRef = db.ref('/status/online');
-      statusRef.on('value', snapshot => {
-        const online = snapshot.val();
-        const statusEl = document.getElementById("status");
-        statusEl.textContent = online ? "Status: Online" : "Status: Offline";
-        statusEl.style.color = online ? "green" : "red";
+    function updateOnlineStatus() {
+      const el = document.getElementById("status-indicator");
+      db.ref("status").on("value", snap => {
+        const online = snap.val();
+        el.textContent = online === "online" ? "Online" : "Offline";
+        el.className = `status ${online === "online" ? "on" : "off"}`;
+      });
+    }
+
+    function populateWiFiList() {
+      const select = document.getElementById("wifiSelect");
+      db.ref("available_networks").once("value", snap => {
+        select.innerHTML = "";
+        const list = snap.val() || [];
+        list.forEach(ssid => {
+          const opt = document.createElement("option");
+          opt.value = ssid;
+          opt.textContent = ssid;
+          select.appendChild(opt);
+        });
+      });
+    }
+
+    function connectWiFi() {
+      const ssid = document.getElementById("wifiSelect").value;
+      const pass = document.getElementById("wifiPassword").value;
+      if (!ssid || !pass) return alert("Please select a network and enter a password.");
+      document.getElementById("spinner").classList.remove("hidden");
+      db.ref("wifi_credentials").set({ ssid, password: pass }, () => {
+        setTimeout(() => document.getElementById("spinner").classList.add("hidden"), 2000);
       });
     }
   </script>
